@@ -1,0 +1,42 @@
+name: CI
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - "pkg/**"
+      - "cmd/**"
+      - "internal/**"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch: # allows manually triggering the workflow
+
+concurrency: # see: https://docs.github.com/en/actions/using-jobs/using-concurrency
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+      - name: "setup env"
+        run: |
+          go version
+          echo "cachetest=$(go env GOCACHE)" >> $GITHUB_ENV
+          echo "cachemod=$(go env GOMODCACHE)" >> $GITHUB_ENV
+      - name: "check environment"
+        env:
+          ENV: "local"
+        run: |
+          go mod tidy
+          go mod verify
+      - name: "run test"
+        run: go test -v -race -tags=integration ./...
